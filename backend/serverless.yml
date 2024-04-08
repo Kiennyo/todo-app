@@ -1,0 +1,146 @@
+service: todo-app
+frameworkVersion: '3'
+
+custom:
+  tableName: 'todos-table-${sls:stage}'
+  userPool: 'todo-app-user-pool-${sls:stage}'
+  userPoolClient: 'todo-app-user-pool-client-${sls:stage}'
+  authDomain: 'todo-app-auth-${sls:stage}'
+  authorizer: 'todo-app-authorizer-${sls:stage}'
+  dynamodb:
+    stages:
+      - dev
+    start:
+      port: 8000
+      noStart: true
+      migrate: true
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - Fn::GetAtt: [ TodosTable, Arn ]
+  httpApi:
+    cors: true
+    authorizers:
+      serviceAuthorizer:
+        identitySource: $request.header.Authorization
+        issuerUrl:
+          Fn::Join:
+            - ''
+            - - 'https://cognito-idp.'
+              - '${opt:region, self:provider.region}'
+              - '.amazonaws.com/'
+              - Ref: CognitoUserPool
+        audience:
+          - Ref: CognitoAppClient
+
+
+  environment:
+    TODOS_TABLE: ${self:custom.tableName}
+    USER_POOL_ID: { Ref: CognitoUserPool }
+    CLIENT_ID: { Ref: CognitoAppClient }
+
+functions:
+  api:
+    handler: ./src/index.handler
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: OPTIONS
+      - httpApi:
+          path: '*'
+          authorizer: serviceAuthorizer
+
+resources:
+  Resources:
+    TodosTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: 'userId'
+            AttributeType: 'S'
+          - AttributeName: 'todoId'
+            AttributeType: 'S'
+        KeySchema:
+          - AttributeName: 'userId'
+            KeyType: 'HASH'
+          - AttributeName: 'todoId'
+            KeyType: 'RANGE'
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:custom.tableName}
+
+    CognitoUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        AdminCreateUserConfig:
+          AllowAdminCreateUserOnly: false
+        UserPoolName: ${self:custom.userPool}
+        UserAttributeUpdateSettings:
+          AttributesRequireVerificationBeforeUpdate:
+            - email
+        UsernameAttributes:
+          - email
+        AutoVerifiedAttributes:
+          - email
+        MfaConfiguration: OFF
+        EmailConfiguration:
+          EmailSendingAccount: COGNITO_DEFAULT
+        Policies:
+          PasswordPolicy:
+            RequireLowercase: true
+            RequireSymbols: true
+            RequireNumbers: true
+            MinimumLength: 8
+            RequireUppercase: true
+        AccountRecoverySetting:
+          RecoveryMechanisms:
+            - Name: verified_email
+              Priority: 1
+
+    CognitoAppClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        AllowedOAuthFlowsUserPoolClient: true
+        AllowedOAuthFlows:
+          - code
+        AllowedOAuthScopes:
+          - openid
+        ClientName: ${self:custom.userPoolClient}
+        UserPoolId:
+          Ref: CognitoUserPool
+        GenerateSecret: false
+        CallbackURLs:
+          - http://localhost:5173/callback
+          - https://www.telia-todo-app-assignment.net/callback
+        LogoutURLs:
+          - http://localhost:5173/logout
+          - https://www.telia-todo-app-assignment.net/logout
+        ExplicitAuthFlows:
+          - ALLOW_REFRESH_TOKEN_AUTH
+          - ALLOW_USER_SRP_AUTH
+        SupportedIdentityProviders:
+          - COGNITO
+
+    CognitoUserPoolDomain:
+      Type: AWS::Cognito::UserPoolDomain
+      Properties:
+        UserPoolId:
+          Ref: CognitoUserPool
+        Domain: ${self:custom.authDomain}
+
+plugins:
+  - serverless-plugin-typescript
+  - serverless-dynamodb
+  - serverless-offline
