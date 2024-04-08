@@ -4,7 +4,7 @@ import cors from "cors"
 import {Service} from "./service";
 import {validateNewTodo, validateUpdateTodo} from "./validator";
 import {CreateTodoModel, UpdateTodoModel} from "./models";
-import {authorizationMiddleware} from "./authorizationMiddleware";
+import {authorizationMiddleware, localAuthorizationMiddleware} from "./authorizationMiddleware";
 
 const app = express();
 const service = new Service();
@@ -14,7 +14,7 @@ app.options('*', cors(
     {maxAge: 3600}
 ))
 app.use(express.json());
-app.use(authorizationMiddleware);
+app.use(process.env.IS_OFFLINE ? localAuthorizationMiddleware : authorizationMiddleware);
 
 app.get("/todos", async (req: Request, res: Response) => {
     try {

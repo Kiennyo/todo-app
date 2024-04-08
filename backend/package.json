@@ -4,7 +4,7 @@
   "description": "",
   "main": "./build/index.js",
   "scripts": {
-    "dev": "serverless offline start"
+    "dev": "serverless offline start --config serverless-local.yml"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.549.0",

@@ -1,13 +1,16 @@
 import {NextFunction, Request, Response} from "express"
 import {CognitoJwtVerifier} from "aws-jwt-verify";
+import {CognitoJwtVerifierSingleUserPool, CognitoVerifyProperties} from "aws-jwt-verify/cognito-verifier";
 
-// TODO configure this middleware so we could send our locally generated tokens for testing
+let verifier: CognitoJwtVerifierSingleUserPool<CognitoVerifyProperties & {userPoolId: string}>
 
-const verifier = CognitoJwtVerifier.create({
-    tokenUse: "access",
-    userPoolId: process.env.USER_POOL_ID || "",
-    clientId: process.env.CLIENT_ID || "",
-});
+if (!process.env.IS_OFFLINE) {
+    verifier = CognitoJwtVerifier.create({
+        tokenUse: "access",
+        userPoolId: process.env.USER_POOL_ID || "",
+        clientId: process.env.CLIENT_ID || "",
+    });
+}
 
 export const authorizationMiddleware = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -17,4 +20,9 @@ export const authorizationMiddleware = async (req: Request, res: Response, next:
     } catch(err) {
         res.status(403).json({error: "Forbidden"})
     }
+}
+
+export const localAuthorizationMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+    req.subject = "local-user"
+    next();
 }

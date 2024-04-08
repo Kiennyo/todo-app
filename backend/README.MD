@@ -26,9 +26,10 @@ Before deploying your serverless application, you must follow the below steps:
 
 ## Development Flow
 
-### NOTE
-Unfortunately currently it is not possible to start service locally, 
-would need to use separate serverless file and modify `authorizationMiddleware.ts` so we could execute requests locally
+### Local Development
+To start locally have DynamoDB running locally, you could do that by running `docker-compose up` 
+
+and then starting service locally by running `npm run dev` 
 
 ## API Reference
 The app provides the following endpoints:
